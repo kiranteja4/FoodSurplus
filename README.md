@@ -18,6 +18,12 @@ npm run dev
 ```
 Check it works: open http://localhost:5000/api/v1/health
 
+#### Temporary Windows Atlas DNS workaround
+
+If Windows system DNS cannot resolve the Atlas SRV record, set `DEV_USE_PUBLIC_DNS=true` in `backend/.env`. This applies Google's public DNS servers only to the backend Node process and only when `NODE_ENV=development`; startup rejects the setting in test or production. Keep it disabled by default and do not enable it in production.
+
+To remove the workaround, first verify Windows can resolve the Atlas SRV record and the backend connects without the override. Then set `DEV_USE_PUBLIC_DNS=false` (or remove the setting) from `backend/.env` and restart the backend.
+
 ### 2. Frontend
 ```bash
 cd frontend

@@ -1,11 +1,13 @@
 import 'dotenv/config';
 import { z } from 'zod';
+import { isDnsOverrideConfigurationAllowed } from './dns.js';
 
 // Fail fast at startup if configuration is missing or weak.
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(5000),
-  CLIENT_URL: z.string().url().default('http://localhost:5173'),
+  DEV_USE_PUBLIC_DNS: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
+  CLIENT_URL: z.string().url().optional(),
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
@@ -22,4 +24,18 @@ if (!parsed.success) {
   for (const issue of parsed.error.issues) console.error(` - ${issue.path.join('.')}: ${issue.message}`);
   process.exit(1);
 }
-export const env = parsed.data;
+
+if (!isDnsOverrideConfigurationAllowed(parsed.data)) {
+  console.error('Invalid environment configuration: DEV_USE_PUBLIC_DNS can only be enabled in development');
+  process.exit(1);
+}
+
+if (parsed.data.NODE_ENV === 'production' && !parsed.data.CLIENT_URL) {
+  console.error('Invalid environment configuration: CLIENT_URL is required in production');
+  process.exit(1);
+}
+
+export const env = {
+  ...parsed.data,
+  CLIENT_URL: parsed.data.CLIENT_URL ?? 'http://localhost:5173',
+};

@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
+import { createCorsOptions } from './config/cors.js';
 import healthRoutes from './routes/health.routes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
@@ -13,7 +14,7 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+  app.use(cors(createCorsOptions(env)));
   app.use(express.json({ limit: '10kb' }));
   app.use(cookieParser());
   app.use(mongoSanitize()); // blocks NoSQL operator injection ($, .)
