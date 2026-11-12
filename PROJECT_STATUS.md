@@ -2,7 +2,7 @@
 
 ## Current stage
 
-Phase 1 design system and frontend foundation has been implemented. The production build passes. A visual browser review remains unverified because the in-app browser could not connect to the local Vite server; the frontend has no browser automation setup. Do not start Phase 2 until Phase 1 review is complete and explicitly approved.
+Phase 1 design system and frontend foundation is completed. The project owner performed and reviewed desktop, tablet and mobile visual verification, and successfully checked the backend health endpoint and frontend Axios integration. The frontend production build passed. Phase 2 is awaiting explicit project-owner approval; do not begin implementation before approval.
 
 ## Approved product decisions
 
@@ -19,7 +19,7 @@ Phase 1 design system and frontend foundation has been implemented. The producti
 
 ## Repository implementation snapshot
 
-Implemented today: React/Vite health-status page and shared Axios client; Express health endpoint; MongoDB connection; environment validation; Helmet, CORS, request parsing, NoSQL sanitation and rate limiting; Socket.IO server initialization; starter health/CORS/DNS tests.
+Implemented today: React/Vite application with BrowserRouter/AppRoutes, responsive PublicLayout, SiteHeader/SiteFooter, LandingPage and NotFoundPage; reusable Button, Container, SectionHeading and ApiHealthStatus components; Tailwind design tokens and global styles; shared Axios client and health-status request. Backend foundation includes the Express health endpoint, MongoDB connection, environment validation, Helmet, CORS, request parsing, NoSQL sanitation and rate limiting, plus Socket.IO server initialization. Starter backend health/CORS/DNS tests are present.
 
 Not implemented: user authentication, organization verification, RBAC, domain models, donations, claims, pickups, evidence/image uploads, notifications, audit events, maps or product/admin workflows. Architecture documentation describes targets, not completed features.
 
@@ -91,10 +91,12 @@ No dependencies or backend files were changed.
 
 - `npm run build` — passed (Vite production build).
 - Frontend tests/lint — unavailable; `package.json` defines no test or lint scripts and no frontend test framework is installed.
-- API health integration — source path and response-field use preserved. Runtime request not verified because no process was listening on port 5000 during this task.
-- Responsive layout — breakpoint rules for mobile, tablet and desktop are present and statically reviewed. Browser visual validation is still pending: the in-app browser timed out connecting to `127.0.0.1:5173`, and no browser automation package is installed.
+- API health integration — project owner successfully checked the backend health endpoint and frontend Axios request against it.
+- Visual review — project owner performed desktop, tablet and mobile visual verification.
+- Frontend automated tests/lint — not configured; no frontend test or lint scripts are present.
+- Backend health tests — still require verification in the normal local environment because the audit sandbox encountered `EACCES` when Supertest attempted to bind a local port. DNS and CORS tests passed in that audit run.
 - `git diff --check` — passed. Git emitted line-ending normalization warnings for modified files, but no whitespace errors.
 
 ## Recommended next step
 
-Finish Phase 1 review by opening the frontend on the development machine at mobile, tablet and desktop widths, checking navigation and the health status with the backend available, then review the visual result and approve Phase 2 explicitly. Phase 2 has not started.
+Phase 1 is complete. Phase 2 — Public Experience & Real Donation Discovery — is awaiting explicit project-owner approval. Its scope and the unresolved location precision decision are documented in `docs/architecture/DEVELOPMENT_ROADMAP.md`. Phase 2 implementation has not started.

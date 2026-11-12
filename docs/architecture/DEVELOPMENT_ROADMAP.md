@@ -1,25 +1,32 @@
 # FoodSurplus Development Roadmap
 
-This roadmap follows the approved MVP decisions in [Product requirements](PRODUCT_REQUIREMENTS.md). Product workflows are planned, not implemented. Work in small reviewable increments; no application implementation begins until Phase 1 is explicitly approved.
+This roadmap follows the approved MVP decisions in [Product requirements](PRODUCT_REQUIREMENTS.md). Product workflows are planned unless explicitly marked completed in `PROJECT_STATUS.md`. Work in small reviewable increments; Phase 2 begins only after the project owner approves it.
 
-## Phase 0 — Architecture consolidation (current)
+## Phase 0 — Architecture consolidation (completed)
 
 - Audit the scaffold and align requirements, system/frontend/backend architecture, schema, API, security, design system, testing and roadmap.
 - Deliver the ten architecture documents plus `PROJECT_STATUS.md`.
-- Exit: cross-document state, authorization, retention and phase dependencies agree; owner approves Phase 1 separately.
+- Exit: cross-document state, authorization, retention and phase dependencies are documented.
 
-## Phase 1 — Design system and application shell
+## Phase 1 — Design system and application shell (completed)
 
 - Align tagline/copy and establish accessible Organic Sustainability tokens.
-- Add minimal public/auth/Donor/NGO/Admin route shells using existing frontend directories; implement route UX only, not permission security.
-- Add essential loading/error/empty/status patterns and ensure mock data is explicitly selected and cannot replace failed real API calls.
-- Exit: responsive shell and frontend build reviewed; no business workflow represented as complete.
+- Implement the public application shell, landing page, not-found page, responsive navigation, reusable baseline UI and Tailwind design tokens.
+- Retain the shared Axios client and health-status UI.
+- Exit: project owner completed desktop, tablet and mobile visual review; backend health endpoint and frontend Axios integration checks succeeded; frontend production build passed. These results are recorded in `PROJECT_STATUS.md`.
 
-## Phase 2 — Public landing and discovery prototype
+## Phase 2 — Public Experience & Real Donation Discovery (awaiting approval)
 
-- Build landing page and public listing/detail presentation against an explicit local mock adapter to validate layout and privacy-safe fields.
-- Mark fixtures as demo data; do not imply they are live donations. Keep the real API adapter separate.
-- Agree public listing DTO and approximate-location display. Real listing integration waits until verified donors can publish data in Phase 4.
+- Use real MongoDB-backed APIs for public donation discovery. API responses must come from persisted database records; never substitute mock API results or present fixture data as live donor activity after an API error.
+- Add a Donation Mongoose model with schema validation and indexes appropriate to public availability, pickup deadline, category, donor organization and supported search. Select indexes based on the actual query contract; do not add a geospatial index until location policy and query behavior are approved.
+- Provide a development-only seed script for sample donation records. It must refuse to run in production and must not be wired into normal server startup. Label seeded records as development/demo data where they can be recognized by developers.
+- Implement public donation listing and detail APIs. Expose only available, eligible listings and privacy-safe public DTOs; return no exact address/coordinates, contact details, pickup instructions, claim data or private evidence.
+- Validate query parameters and route identifiers. Support bounded pagination, search, category filters and availability filters. Define stable sorting and response metadata. Do not allow client-controlled MongoDB operators or arbitrary query fields.
+- Implement frontend donation listing and detail pages, reusable donation cards and filters, and clear loading, empty and error states. Keep the API layer separate from presentation and do not fall back to local fixtures when the real API fails.
+- Add backend tests for validation, filtering, pagination, API response behavior and privacy redaction; add frontend tests for listing/detail states, filters and accessibility-relevant interactions. Frontend automated testing is not currently configured, so select and approve any required test tooling before installing dependencies.
+- **Required decision before location-based discovery:** project owner must approve the exact-location approximation precision and public location representation. Do not invent a precision or expose exact location. Other search/category/availability features may be implemented without location-based discovery until this decision is made.
+- Donor publishing is not part of Phase 2. Development seed records are the discovery data source until donor listing creation is implemented in Phase 4.
+- Exit: real API-backed listing and detail views work against MongoDB; server-side validation, pagination, filters and privacy rules are tested; owner reviews the phase results.
 
 ## Phase 3 — Authentication, organizations and minimum verification
 
@@ -34,11 +41,11 @@ This roadmap follows the approved MVP decisions in [Product requirements](PRODUC
 - Add automatic expiry of Available donations with preserved history.
 - Do not place claim review in this phase; claims do not exist yet.
 
-## Phase 5 — Real public discovery and NGO portal
+## Phase 5 — NGO portal
 
-- Connect listing/discovery pages to the real privacy-safe API and add filters for category, quantity and location.
-- Implement NGO organization profile and verification status; approved NGOs may inspect eligible public listings.
-- Keep public maps optional; never return exact coordinates/contact/pickup details. Collection history waits until pickups exist in Phase 6.
+- Implement NGO organization profile and verification-status views; approved NGOs may inspect eligible public listings already delivered in Phase 2.
+- Add NGO-specific discovery improvements only where requirements extend beyond the public discovery experience. Keep public maps optional and subject to the approved location policy; never return exact coordinates/contact/pickup details.
+- Collection history waits until pickups exist in Phase 6.
 
 ## Phase 6 — Claims, pickups, expiry, notifications and exceptions
 
