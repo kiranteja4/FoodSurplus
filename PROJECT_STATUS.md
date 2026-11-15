@@ -2,101 +2,51 @@
 
 ## Current stage
 
-Phase 1 design system and frontend foundation is completed. The project owner performed and reviewed desktop, tablet and mobile visual verification, and successfully checked the backend health endpoint and frontend Axios integration. The frontend production build passed. Phase 2 is awaiting explicit project-owner approval; do not begin implementation before approval.
+Phase 1 public frontend foundation is completed. Phase 2 — Public Experience & Real Donation Discovery — has finalized scope and M0 decisions. M1 shared categories, core models and quantity utilities are implemented; M1 remains in progress because the complete backend suite could not pass its existing loopback health tests in this environment.
 
-## Approved product decisions
+## Phase 2 scope
 
-- Donor and NGO organizations both require administrator verification before publishing or claiming. Verification evidence is private.
-- An MVP user has one primary Donor or NGO membership. Admin is separately provisioned.
-- A claim is all-or-nothing for one NGO. Creating a pending claim immediately reserves the full donation; donor approval is required. Rejection, eligible cancellation and pending expiry release the reservation transactionally and idempotently.
-- Food eligibility requires explicit preparation, handling, storage, allergen, expiry and collection details as applicable. Unknown handling history or insufficient critical details makes a listing ineligible; the platform does not guarantee food safety.
-- Donation and pending-claim expiry are automatic while preserving history. Missed or disputed approved pickups require explicit exception resolution and are never automatically redistributed.
-- Donors propose pickup slots; NGOs select and confirm. Booking must prevent double-booking. Collection confirmation, cancellation, rescheduling and disputes are tracked.
-- Public discovery exposes approximate location only. Exact pickup details require an approved claim and server authorization.
-- Notifications are persisted in-app records; REST is authoritative. Email/SMS and Socket.IO delivery are deferred.
-- Donation, claim and pickup history is preserved. Retention and deletion policies must be set before cleanup jobs are implemented; no legal periods are invented here.
-- The Organic Sustainability design direction and tagline “Less waste. More nourishment. Stronger communities.” are approved.
+Phase 2 plans MongoDB-backed Donation records and a minimal Organization model; public listing/detail APIs; search, category filtering, bounded pagination and deterministic sorting; explicit public DTOs; responsive listing/detail pages; a development-only seed of approximately 15–20 demo donations; and backend/frontend automated tests.
 
-## Repository implementation snapshot
+Phase 2 excludes authentication/registration, organization verification, donor publishing, claims/approval, reservation, pickup scheduling, admin dashboards, location-based discovery, image uploads/Cloudinary, Socket.IO notifications and real-activity impact analytics. Phase 3 may extend Organization. None of these planned features is implemented.
 
-Implemented today: React/Vite application with BrowserRouter/AppRoutes, responsive PublicLayout, SiteHeader/SiteFooter, LandingPage and NotFoundPage; reusable Button, Container, SectionHeading and ApiHealthStatus components; Tailwind design tokens and global styles; shared Axios client and health-status request. Backend foundation includes the Express health endpoint, MongoDB connection, environment validation, Helmet, CORS, request parsing, NoSQL sanitation and rate limiting, plus Socket.IO server initialization. Starter backend health/CORS/DNS tests are present.
+## M0 decision register — finalized
 
-Not implemented: user authentication, organization verification, RBAC, domain models, donations, claims, pickups, evidence/image uploads, notifications, audit events, maps or product/admin workflows. Architecture documentation describes targets, not completed features.
+| Area | Owner-approved decision |
+|---|---|
+| Food categories | Exactly Prepared Meals; Fruits & Vegetables; Bakery; Dairy Products; Packaged Food; Grains & Staples; Other. These are donated-food categories, not Organization types. |
+| Organization | Minimal fields: `_id`, `name`, `type`, `createdAt`, `updatedAt`. `name` is the sole public Organization field. `type` is an unrestricted string in Phase 2; do not add an enum. Other Organization fields remain private. |
+| Quantity | Units are kg, g, L, mL, servings, packets. Approved precision: kg up to 3 decimals; g whole; L up to 3 decimals; mL whole; servings up to 2 decimals; packets whole by default, with fractions only for meaningful partial packets. Use Decimal128, accept/validate decimal strings, and serialize quantities as strings. Reject zero, negative, non-finite, malformed and out-of-range values. `availableQuantity` must not exceed `quantity`. No maximum donation quantity is defined. |
+| Public status | Only `Available` is defined for Phase 2 discovery. Do not define the future status lifecycle. Eligibility is status Available, `availableUntil` later than server time, and `availableQuantity` greater than zero. Server time controls eligibility. |
+| Dates | Store UTC instants, serialize API timestamps consistently as ISO 8601 UTC, and display dates in the browser's local timezone. `availableUntil` is canonical; `foodExpiryAt` is separate and optional; `preparedAt` and `packedAt` are optional. Do not use `pickupDeadline` or apply food expiry as another eligibility rule without food-safety policy. |
+| Public Donation DTO | Exact allowlist: `id`, `title`, `description`, `category`, `quantity`, `availableQuantity`, `quantityUnit`, `availableUntil`, and optional `foodExpiryAt`, `preparedAt`, `packedAt`; nested Organization includes `name` only. Exclude status, Organization IDs/type/timestamps, exact location, contacts, pickup instructions, verification evidence, moderation information and internal claim/state fields. Never serialize whole Mongoose documents. |
+| Donation errors | Use `{ success: false, error: { code, message, details } }`. Validation errors use `VALIDATION_ERROR`, message `Invalid request`, and `details: null`. Keep details null for public donation errors unless the contract is explicitly revised. Preserve health and unrelated-route responses. Do not expose stacks or internal database messages. |
 
-## Documentation deliverables
+## Technical recommendations and verification state
 
-The ten architecture documents are:
+- Use `shared/donationCategories.mjs` as the single category source. Configure Vite access for only the frontend root and shared directory.
+- Represent quantity values as Decimal128 and wire values as decimal strings. These match the owner-approved precision and serialization decisions.
+- For packets, M1 permits any positive Decimal128-representable fractional value because no universal fractional scale was approved. Whether a partial packet is meaningful must be judged when a future input workflow has product context; no model heuristic is invented.
+- Seed with stable fixed IDs, insert-only upserts, collision checks, a production guard before database connection, no deletion, and no startup invocation.
+- Keep candidate indexes provisional until representative query-plan evidence is available.
+- Frontend test candidates are Vitest 3.2.4, React Testing Library 16.3.0, user-event 14.6.1, DOM Testing Library 10.4.2, and jsdom 26.1.0. These are recommendations, not installed dependencies.
+- Backend tests use Jest, Supertest and mongodb-memory-server. Tests must connect only to an isolated in-memory database and close the connection/server during teardown.
+- M1 model and utility tests pass. The full backend suite's existing health tests could not bind loopback sockets (`EACCES`) in this environment. The frontend production build and shared-module bundling pass. No index query plan, seed behavior, API or discovery UI has been implemented or verified.
 
-1. `docs/architecture/PRODUCT_REQUIREMENTS.md`
-2. `docs/architecture/SYSTEM_ARCHITECTURE.md`
-3. `docs/architecture/FRONTEND_ARCHITECTURE.md`
-4. `docs/architecture/BACKEND_ARCHITECTURE.md`
-5. `docs/architecture/DATABASE_DESIGN.md`
-6. `docs/architecture/API_SPECIFICATION.md`
-7. `docs/architecture/AUTH_AND_SECURITY.md`
-8. `docs/architecture/UI_DESIGN_SYSTEM.md`
-9. `docs/architecture/DEVELOPMENT_ROADMAP.md`
-10. `docs/architecture/TESTING_STRATEGY.md`
+## Remaining policy boundary
 
-These are aligned around one membership model, explicit state machines, private location/evidence, transactional allocation, persisted notifications, a staged implementation order and the existing layered project scaffold.
+The complete future Donation status lifecycle remains intentionally undefined. Food-safety/eligibility policy for the launch jurisdiction and food-handling requirements remain pending. Location discovery is excluded from Phase 2; public location precision is not needed to start this phase. Final index definitions remain unverified until query-plan validation.
 
-## Open implementation inputs
+## Implemented foundation
 
-Before affected features are implemented, decide the approval-window value, evidence types and review checklist, launch-jurisdiction food eligibility policy, pickup timezone/slot duration/cancellation and dispute policy, suspension disposition and eligible-cancellation rules, public-location approximation precision, and records-retention/cleanup policy. The architecture documents identify these as unresolved settings; no behavior should be silently invented.
+The frontend has React/Vite with BrowserRouter/AppRoutes, responsive PublicLayout, SiteHeader/SiteFooter, LandingPage and NotFoundPage; reusable Button, Container, SectionHeading and ApiHealthStatus components; Tailwind design tokens/global styles; and a shared Axios health request. Backend foundation includes the Express health endpoint, MongoDB connection, environment validation, Helmet, CORS, request parsing, NoSQL sanitization and rate limiting, plus Socket.IO server initialization. Starter backend health/CORS/DNS tests are present.
 
-## Existing work and constraints
+Organization and Donation models, shared categories, quantity utilities, and focused M1 tests now exist. Donation APIs, discovery pages, seed scripts and later domain workflows do not. Architecture documents describe target behavior except where this status records implemented M1 work. See [API documentation](API_DOCUMENTATION.md) for current API behavior.
 
-Application changes were already present before this documentation task. They were preserved and were not edited as part of this task. The documentation update does not change application code, dependencies, environment files or Git history. The development-only `DEV_USE_PUBLIC_DNS` workaround remains temporary and default-off; remove it after system DNS reliably resolves Atlas SRV/TXT records.
+## Phase 1 validation record
 
-The README and Development Log contain older phase tracking and have not been reconciled. Frontend automated tests/linting are not configured. The development-only `DEV_USE_PUBLIC_DNS` workaround remains temporary and default-off; remove it after system DNS reliably resolves Atlas SRV/TXT records.
+The owner-reviewed desktop, tablet and mobile visuals; the health endpoint and frontend Axios integration were checked; and the frontend production build passed, as recorded in the existing project log. Backend health tests still require verification in a normal local environment after the audit sandbox encountered EACCES binding a local port. This documentation update did not rerun those checks.
 
-## Phase 1 implementation
+## Documentation map
 
-### Completed
-
-- Organic Sustainability palette tokens: forest, sage, earth, harvest, paper and ink; Fraunces display headings and Inter body text remain in use.
-- Responsive public shell with brand, desktop navigation, accessible mobile menu, skip link and footer.
-- Landing page with mission, clearly labeled intended workflow, donor/NGO introductions and the approved tagline. It explicitly states that publishing, claiming and partner accounts are not live.
-- Reusable button, container and section-heading components; live API health status with loading, connected, database-status and retry/error states.
-- React Router route table for the real home page and a not-found page. No fake auth, donor, NGO or admin routes were added.
-- Reduced-motion support, visible focus treatment, semantic landmarks and responsive layout rules.
-- Existing health request still uses the shared Axios client at `GET /health` against `VITE_API_URL`; backend code was not changed.
-
-### Files created or modified
-
-Created:
-
-- `frontend/src/routes/AppRoutes.jsx`
-- `frontend/src/components/layout/PublicLayout.jsx`
-- `frontend/src/components/layout/SiteHeader.jsx`
-- `frontend/src/components/layout/SiteFooter.jsx`
-- `frontend/src/components/ui/ApiHealthStatus.jsx`
-- `frontend/src/components/ui/Button.jsx`
-- `frontend/src/components/ui/Container.jsx`
-- `frontend/src/components/ui/SectionHeading.jsx`
-- `frontend/src/pages/public/LandingPage.jsx`
-- `frontend/src/pages/NotFoundPage.jsx`
-
-Modified:
-
-- `frontend/src/App.jsx`
-- `frontend/src/index.css`
-- `frontend/tailwind.config.js`
-- `frontend/index.html`
-- `PROJECT_STATUS.md`
-
-No dependencies or backend files were changed.
-
-### Validation
-
-- `npm run build` — passed (Vite production build).
-- Frontend tests/lint — unavailable; `package.json` defines no test or lint scripts and no frontend test framework is installed.
-- API health integration — project owner successfully checked the backend health endpoint and frontend Axios request against it.
-- Visual review — project owner performed desktop, tablet and mobile visual verification.
-- Frontend automated tests/lint — not configured; no frontend test or lint scripts are present.
-- Backend health tests — still require verification in the normal local environment because the audit sandbox encountered `EACCES` when Supertest attempted to bind a local port. DNS and CORS tests passed in that audit run.
-- `git diff --check` — passed. Git emitted line-ending normalization warnings for modified files, but no whitespace errors.
-
-## Recommended next step
-
-Phase 1 is complete. Phase 2 — Public Experience & Real Donation Discovery — is awaiting explicit project-owner approval. Its scope and the unresolved location precision decision are documented in `docs/architecture/DEVELOPMENT_ROADMAP.md`. Phase 2 implementation has not started.
+Architecture documents cover product requirements, system, frontend, backend, database design, planned API, authentication/security, UI design, roadmap and testing. The README and Development Log provide repository and progress context. M0 is finalized; M1 implementation is present but not yet accepted as complete.

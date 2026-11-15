@@ -2,74 +2,50 @@
 
 ## Current implementation
 
-The backend is an ES-module Express app. Existing top-level directories already include `config`, `routes`, `controllers`, `services`, `models`, `validators`, `middleware`, `sockets`, `jobs` and `utils`; only config, health route, error utilities and middleware are populated. `server.js` initializes HTTP/Socket.IO, applies the optional development DNS setting, connects MongoDB and then listens. `app.js` applies Helmet, credentialed CORS, JSON parsing, cookies, NoSQL sanitation, Morgan in non-test environments, a global `/api` rate limit and `/api/v1/health`.
+The backend is an ES-module Express application with existing top-level layers for config, routes, controllers, services, models, validators, middleware, sockets, jobs and utilities. The health route, middleware and MongoDB connection are implemented. M1 adds Organization and Donation schemas plus quantity utilities and focused model tests. Product routes, feature validators and seed scripts remain unimplemented.
 
-There are no auth or business routes, models, controllers, validators, uploads, Socket.IO authentication/events or jobs. JWT, bcryptjs, multer, Cloudinary and node-cron are installed but not used for product features. `asyncHandler` and `ApiError` are present but not yet used by feature routes.
+## Phase 2 target structure
 
-## Chosen structure: layered directories already scaffolded
-
-Keep the existing top-level layers and add focused feature files within them:
+Add only the discovery pieces needed within the existing layers:
 
 ```text
 src/
-  app.js, server.js
-  config/       env, db, cors
-  routes/       auth, organizations, donations, claims, pickups, notifications, admin
-  controllers/  HTTP translation by feature
-  services/     domain rules and transactions by feature
-  models/       User, Organization, Membership, Donation, Claim, Pickup, etc.
-  validators/   Zod params/query/body schemas by feature
-  middleware/   authenticate, authorize, validate, rate limits, errors
-  jobs/         idempotent donation/claim expiry and retention work
-  sockets/      later authenticated event handlers (not MVP delivery)
-  utils/        current ApiError/asyncHandler and small shared helpers
+  routes/donation.routes.js
+  controllers/donationController.js
+  services/donationService.js
+  models/Donation.js
+  models/Organization.js
+  validators/donationQuery.js
+  middleware/ (existing centralized handling plus donation error formatting)
+scripts/ (explicit development seed entry point; exact placement follows repository convention)
 ```
 
-Do not introduce a nested `modules/<feature>/<layer>` tree or a generic repository framework. Routes stay declarative; controllers translate HTTP; services own business rules, authorization preconditions and database transactions; models own schema validation/index definitions. Existing modules should be extended rather than migrated.
+Keep route handlers declarative, validation in Zod schemas, query/business rules in services and persistence constraints in Mongoose. Do not add authentication, authorization workflows, claims, publishing, uploads, jobs or socket events as part of Phase 2.
 
-## Middleware and endpoint responsibilities
+## Public donation API
 
-1. Helmet and CORS.
-2. Request/correlation ID and redacted structured logs (not present yet).
-3. Body limits, cookie parsing and Mongo sanitization.
-4. API-wide and route-specific rate limits.
-5. Authentication and current account/membership/organization state resolution.
-6. Role, organization membership, resource ownership and verification/operating-state checks.
-7. Zod validation of route params, query and body.
-8. Controller → service → Mongoose model/session.
-9. Standardized response/error mapping.
+Base path: `/api/v1/donations`.
 
-The current API-wide limit is 300 per 15 minutes. Add tighter login, registration, refresh, evidence/image upload, verification decisions and expensive-search limits. Configure trusted proxy hops only for the actual deployment. Use a shared limiter store only if the service is deployed across multiple instances; no dependency is approved for that yet.
+- `GET /` lists eligible records. Parameters: `page` default 1, `limit` default 12 and max 50, optional `search`, optional approved `category`, and `sort` default `soonest`. There is no availability parameter.
+- `GET /:id` returns eligible public detail only.
+- Eligibility requires Available status, `availableUntil > server time`, and `availableQuantity > 0`. Generic unavailable/not-found behavior applies to unavailable, expired or missing records.
+- Search is MongoDB token-based text search over `title` and `description`, not substring matching.
+- Default sort: `availableUntil` ascending, `createdAt` descending, `_id` ascending.
+- Pagination metadata: `page`, `limit`, `totalItems`, `totalPages`, `hasNextPage`, `hasPreviousPage`.
+- New business success/error responses follow `{ success: true, data: ... }` and `{ success: false, error: { code, message, details } }`. Keep health response compatibility.
 
-## Approved domain rules and atomic operations
+## Validation and privacy
 
-### Claim creation and reservation
+Validate route IDs and all supported query parameters; allowlist enum values and never pass client-controlled Mongo operators or arbitrary fields into queries. Return explicit public DTO allowlists, including only the approved Organization public display name. Exclude exact pickup address/coordinates, private contacts, pickup instructions, verification evidence, moderation information and internal claim/state fields. No location-based discovery is approved.
 
-One donation permits one all-or-nothing active claim. In a MongoDB transaction, conditionally change `Donation.status` from `available` to `reserved`, set `activeClaimId`, create the `pending` claim for the full quantity, and persist the donor notification. A retry with the same idempotency key returns the same claim. A different concurrent request that no longer matches `available` returns 409. The transaction must commit all writes or none.
+The sole public Organization field is `name`; `type` is an unrestricted Phase 2 string, with no enum. The Donation status lifecycle beyond Available is intentionally undefined. Quantity units and per-unit precision are finalized in [Project status](../../PROJECT_STATUS.md); use Decimal128 and decimal-string API values. Store UTC instants, emit ISO 8601 UTC timestamps, and leave local-time display to the browser. Food-safety/eligibility and handling policies remain pending. Candidate index definitions remain unverified pending query-plan evidence.
 
-Approval changes `pending` to `approved` and `reserved` donation to `claimed` only if the approval deadline and pickup deadline remain future and both organizations remain approved/active. Rejection, eligible cancellation or pending timeout atomically closes the claim, clears the matching active claim pointer and releases the donation only if still eligible. All release jobs use conditional state filters and are safe to repeat.
+## Index and seed guidance
 
-Use Atlas replica-set transactions and a replica-set MongoDB Memory Server fixture for tests. Do not implement a weaker read-then-write reservation path.
+Candidate indexes are `status + availableUntil`, `category + status + availableUntil`, and a text index on `title + description`. Treat these as candidates and validate with representative query plans before finalizing. The seed should create approximately 15–20 realistic demo donations across all seven approved food categories with valid Organization references. It must be development-only, idempotent, refuse production, never run at server startup, and never delete unrelated records.
 
-### Expiry and exception handling
+## Error responses and security boundary
 
-`foodExpiryAt` and `pickupDeadline` are separate. A scheduled job transitions available donations at their deadline and pending claims at their stored `approvalExpiresAt`; on pending expiry, release to `available` only if the donation remains valid and active, otherwise expire/cancel it. Never delete history through TTL.
+Donation endpoint errors use the mapping in [API specification](API_SPECIFICATION.md), with `details: null` initially. Use donation-scoped formatting so health and unrelated unknown-route behavior remain unchanged. Unexpected errors must not expose stack traces or database messages.
 
-An approved pickup missed/disputed deadline leaves the donation `claimed`; pickup becomes `missed`/`disputed` and claim becomes `exceptionReview`. Do not automatically redistribute. Admin resolution closes the claim and only returns a donation to `available` after donor revalidation and while its deadline remains future.
-
-### Verification and suspension
-
-Both donor and NGO organizations need an approved verification submission before publishing or claiming. Store evidence references in a private verification-submission model; only authorized admins can issue short-lived access. Rejection can be corrected/resubmitted. Organization suspension blocks new publishing/claims and is audited. Proposed default: pending claims are closed with safe reservation release; approved claims go to exception review. Exact suspension disposition is a release policy to confirm.
-
-### Pickup and notifications
-
-After approval, the donor proposes non-overlapping slots; the NGO selects/confirms one. Lock the slot atomically to prevent double booking. NGO collection confirmation completes pickup/claim/donation; a dispute enters exception review. Persist in-app notification records in the relevant transaction. MVP has no socket or external email/SMS delivery.
-
-## Security and operations
-
-- Verify current account, membership, organization approval/active state and ownership on every protected operation; never trust role/status in client input or stale token claims.
-- Use session-aware auth design in [Auth and security](AUTH_AND_SECURITY.md); redact secrets and private evidence from logs.
-- Keep public listing DTOs allowlisted with approximate location only.
-- Keep public donation images separate from private verification evidence and validate file bytes, size and type before Cloudinary transfer.
-- Current server waits for MongoDB before listening and has no readiness/liveness split, graceful shutdown, retry/backoff or production structured logger. Define these before deployment.
-- The development DNS override is temporary, default-off and rejected outside development. Production uses platform-managed DNS.
+The public read APIs do not require Phase 2 authentication, but still validate inputs, limit pagination, avoid information leaks and serialize allowlisted fields only. Later authorization controls remain necessary for private operations introduced in later phases. Existing rate limiting, CORS, Helmet and centralized error middleware remain part of the foundation. Do not expose stack traces or internal errors in production.

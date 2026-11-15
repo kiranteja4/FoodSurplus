@@ -15,18 +15,19 @@ This log follows the approved phases in [the development roadmap](docs/architect
 - Frontend production build passed. Frontend automated tests/lint are not configured.
 - Backend health tests still need verification in a normal local environment because the audit sandbox encountered `EACCES` while binding a local port; DNS and CORS tests passed in that audit run.
 
-## Phase 2 — Public Experience & Real Donation Discovery (awaiting approval; not started)
+## Phase 2 — Public Experience & Real Donation Discovery (scope finalized; M1 in progress)
 
-The approved roadmap calls for a Donation model, appropriate indexes, a production-blocked development seed script, public MongoDB-backed listing/detail APIs, validated search/filter/pagination, privacy-safe responses, frontend discovery pages and tests. Donor publishing is deferred to Phase 4. Location-based discovery requires an owner decision on public location approximation precision. No Phase 2 implementation has started.
+M0 owner decisions are finalized and recorded in [Project status](PROJECT_STATUS.md). The scope calls for Donation and minimal Organization models, public MongoDB-backed listing/detail APIs, token-based title/description search, the seven approved food categories, pagination and deterministic sorting, the exact public DTO allowlist, responsive discovery pages, and backend/frontend automated tests. A development-only idempotent seed will provide approximately 15–20 demo records. Phase 2 excludes authentication, verification, donor publishing, claims, reservation, pickup scheduling, admin dashboards, location discovery, uploads, Socket.IO notifications and real-activity impact analytics.
+
+### M1 — Shared categories and core data models (implementation present; acceptance incomplete)
+
+- Added the canonical ESM donation categories, minimal Organization and Donation models, Decimal128 quantity utilities, and isolated Jest coverage. No external database or memory-server binary was used.
+- Focused model, quantity and category tests passed. The full backend run passed five suites, but existing loopback health tests failed with environment `EACCES` socket-bind errors.
+- Vite 5.4.21 production build and a production-bundler check of the shared module passed. No dependencies or package files changed.
+- M1 remains in progress until full-suite verification can pass in an environment that permits the existing health test server to bind loopback.
 
 ## Later phases — planned
 
-- **Phase 3:** Authentication, organizations and minimum verification.
-- **Phase 4:** Donor listings and pickup availability.
-- **Phase 5:** NGO portal.
-- **Phase 6:** Claims, pickups, expiry, notifications and exceptions.
-- **Phase 7:** Maps and optional realtime delivery.
-- **Phase 8:** Full administrator portal.
-- **Phase 9:** Integration, security and deployment readiness.
+- **Phase 3 and later:** Authentication/registration/verification, donor publishing, claims, pickup scheduling, admin workflows, location discovery, realtime delivery and other product activity remain outside Phase 2. Their requirements and sequencing need owner review before those phases are implemented.
 
-See the [roadmap](docs/architecture/DEVELOPMENT_ROADMAP.md) for exit criteria, dependencies and unresolved decisions. Planned work is not implemented functionality.
+See the [roadmap](docs/architecture/DEVELOPMENT_ROADMAP.md) for exit criteria and dependencies. Remaining boundaries are the future Donation lifecycle (intentionally undefined), food-safety/handling policy, and index validation by query plans. Planned work is not implemented functionality.

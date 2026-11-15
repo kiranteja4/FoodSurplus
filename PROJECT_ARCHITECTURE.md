@@ -19,14 +19,14 @@ flowchart LR
 ## Current implementation boundaries
 
 - The only registered application API route is `GET /api/v1/health`.
-- MongoDB is connected for the health-status foundation; there are no domain models or product data APIs.
+- MongoDB is connected for the health-status foundation. M1 adds Organization and Donation models; product data APIs remain unimplemented.
 - Socket.IO is initialized but has no feature events or authentication.
 - Authentication, organization verification, role-based authorization, donations, claims, pickups, uploads, notifications, maps and administrator workflows are not implemented.
 - Installed dependencies for planned functionality do not mean those features exist.
 
 ## Planned target architecture
 
-The architecture documents describe the intended product, not the current behavior. Future requests will use feature API modules in the frontend and Express routes/controllers/services/validators/models in the backend. The server will enforce validation, privacy, authorization and domain rules. MongoDB transactions are planned for claim allocation and other coordinated state changes. These features must not be represented as implemented until delivered and verified.
+The architecture documents describe planned behavior except where implementation progress is recorded in [Project status](PROJECT_STATUS.md). Phase 2 owner decisions are finalized; M1 models, shared categories and quantity utilities are implemented, with acceptance still in progress. The target is limited to public MongoDB-backed donation listing/detail discovery, search/category filtering, pagination/sorting, the approved public DTO, a development-only seed, responsive pages and automated tests. Authentication, publishing, claims, reservation, pickups, admin workflows, location discovery and realtime notifications are outside Phase 2. Future requests should use the existing frontend API and page structure and Express routes/controllers/services/validators/models. Do not represent planned features as implemented until delivered and verified.
 
 ## Detailed architecture documents
 

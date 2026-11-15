@@ -1,77 +1,50 @@
 # FoodSurplus Development Roadmap
 
-This roadmap follows the approved MVP decisions in [Product requirements](PRODUCT_REQUIREMENTS.md). Product workflows are planned unless explicitly marked completed in `PROJECT_STATUS.md`. Work in small reviewable increments; Phase 2 begins only after the project owner approves it.
+This roadmap separates implemented foundation work from finalized but not yet implemented Phase 2 scope. See [Product requirements](PRODUCT_REQUIREMENTS.md) for the canonical requirements. No planned feature should be reported as live until implemented and verified.
 
 ## Phase 0 — Architecture consolidation (completed)
 
-- Audit the scaffold and align requirements, system/frontend/backend architecture, schema, API, security, design system, testing and roadmap.
-- Deliver the ten architecture documents plus `PROJECT_STATUS.md`.
-- Exit: cross-document state, authorization, retention and phase dependencies are documented.
+- Audit the scaffold and document product, system, frontend/backend, database, API, security, design, testing and roadmap direction.
 
 ## Phase 1 — Design system and application shell (completed)
 
-- Align tagline/copy and establish accessible Organic Sustainability tokens.
-- Implement the public application shell, landing page, not-found page, responsive navigation, reusable baseline UI and Tailwind design tokens.
-- Retain the shared Axios client and health-status UI.
-- Exit: project owner completed desktop, tablet and mobile visual review; backend health endpoint and frontend Axios integration checks succeeded; frontend production build passed. These results are recorded in `PROJECT_STATUS.md`.
+- Deliver the public shell, landing and not-found pages, responsive navigation, reusable baseline UI, design tokens and health-status integration.
+- Existing health route and API integration were checked; the frontend production build passed as recorded in `PROJECT_STATUS.md`.
 
-## Phase 2 — Public Experience & Real Donation Discovery (awaiting approval)
+## M0 — Technical prerequisites and owner decisions (complete)
 
-- Use real MongoDB-backed APIs for public donation discovery. API responses must come from persisted database records; never substitute mock API results or present fixture data as live donor activity after an API error.
-- Add a Donation Mongoose model with schema validation and indexes appropriate to public availability, pickup deadline, category, donor organization and supported search. Select indexes based on the actual query contract; do not add a geospatial index until location policy and query behavior are approved.
-- Provide a development-only seed script for sample donation records. It must refuse to run in production and must not be wired into normal server startup. Label seeded records as development/demo data where they can be recognized by developers.
-- Implement public donation listing and detail APIs. Expose only available, eligible listings and privacy-safe public DTOs; return no exact address/coordinates, contact details, pickup instructions, claim data or private evidence.
-- Validate query parameters and route identifiers. Support bounded pagination, search, category filters and availability filters. Define stable sorting and response metadata. Do not allow client-controlled MongoDB operators or arbitrary query fields.
-- Implement frontend donation listing and detail pages, reusable donation cards and filters, and clear loading, empty and error states. Keep the API layer separate from presentation and do not fall back to local fixtures when the real API fails.
-- Add backend tests for validation, filtering, pagination, API response behavior and privacy redaction; add frontend tests for listing/detail states, filters and accessibility-relevant interactions. Frontend automated testing is not currently configured, so select and approve any required test tooling before installing dependencies.
-- **Required decision before location-based discovery:** project owner must approve the exact-location approximation precision and public location representation. Do not invent a precision or expose exact location. Other search/category/availability features may be implemented without location-based discovery until this decision is made.
-- Donor publishing is not part of Phase 2. Development seed records are the discovery data source until donor listing creation is implemented in Phase 4.
-- Exit: real API-backed listing and detail views work against MongoDB; server-side validation, pagination, filters and privacy rules are tested; owner reviews the phase results.
+- Owner decisions for categories, Organization name/type, quantities, status eligibility, dates, public Donation DTO and error envelope are finalized in [Project status](../../PROJECT_STATUS.md).
+- Technical recommendations are recorded there; they are not claims that implementation, test tooling or database queries exist.
 
-## Phase 3 — Authentication, organizations and minimum verification
+## Phase 2 — Public Experience & Real Donation Discovery (finalized scope; implementation pending)
 
-- Implement one normal user/one organization membership, Donor/NGO role, secure login/session lifecycle and current-state authorization.
-- Implement organization profiles, private evidence submission, admin approve/reject/resubmit and suspension decisions.
-- Deliver the minimum admin verification queue/API and audit records now; both donor publishing and NGO claiming depend on approved organizations.
-- Exit: auth, membership, evidence privacy and verification tests pass; no public admin registration.
+- Add MongoDB-backed Donation records and a minimal Organization model containing `_id`, public `name`, unrestricted string `type`, `createdAt` and `updatedAt`. Only Organization `name` is public.
+- Use the one shared category module `shared/donationCategories.mjs` for frontend options, backend validation, model values and seed records.
+- Store `quantity` and `availableQuantity` as Decimal128, validate the owner-approved precision by `quantityUnit`, accept decimal strings at the API boundary, and return decimal strings. Enforce `availableQuantity <= quantity`; no maximum quantity is defined.
+- Implement public listing/detail APIs and responsive frontend pages. Listing supports `page` (default 1), `limit` (default 12, max 50), optional `search`, optional `category`, and `sort` (default `soonest`); no availability parameter.
+- Use token-based MongoDB text search over `title` and `description`, exactly seven approved food categories, and deterministic order by `availableUntil` ascending, `createdAt` descending, then `_id` ascending.
+- Discover only Available records with future `availableUntil` and positive `availableQuantity`. Use generic unavailable/not-found behavior for unavailable, expired or missing details.
+- Return this exact public DTO allowlist: `id`, `title`, `description`, `category`, `quantity`, `availableQuantity`, `quantityUnit`, `availableUntil`, optional `foodExpiryAt`, optional `preparedAt`, optional `packedAt`, and nested Organization `name` only. Never serialize whole documents. Omit status, Organization IDs/type/timestamps, exact address/coordinates, private contacts, pickup instructions, verification evidence, moderation details and internal claim/state data.
+- Store UTC instants, serialize timestamps consistently as ISO 8601 UTC strings, and display dates in the browser's local timezone. Server time alone controls eligibility; food expiry is not an additional availability rule without food-safety policy.
+- Donation errors use the initial mapping and `details: null` convention in [API specification](API_SPECIFICATION.md), while preserving health and unrelated-route behavior.
+- Add a development-only idempotent seed with approximately 15–20 realistic records, valid Organization references and all seven categories. Production execution is blocked; startup never runs it; unrelated records are never deleted.
+- Build backend tests using Jest, Supertest and mongodb-memory-server, plus frontend tests using Vitest, React Testing Library and `@testing-library/user-event`. Existing Vite is 5.4.21, so select a compatible Vitest 3.x version. Do not install packages without approval.
+- Candidate indexes (`status + availableUntil`, `category + status + availableUntil`, text on `title + description`) require query-plan validation before final definitions.
+- Explicitly excluded: authentication/registration, verification, donor publishing, claims/approval, quantity reservation, pickup scheduling, admin dashboards, location discovery, uploads/Cloudinary, Socket.IO notifications and real-activity impact analytics.
+- Exit: APIs and pages use persisted records; availability, filters, pagination, sorting and privacy are covered by automated tests; owner reviews the result. No claim that Phase 2 is complete before that point.
 
-## Phase 4 — Donor listings and pickup availability
+## Phase 3 — Authentication and organization workflows (future)
 
-- Approved donors create/edit/cancel listings, upload validated public food images, provide required food/handling/storage/deadline fields and propose non-overlapping pickup slots.
-- Add automatic expiry of Available donations with preserved history.
-- Do not place claim review in this phase; claims do not exist yet.
+May add authentication, registration, verification and extend Organization. Scope, authorization and policy details must be defined before implementation. Do not pull these into Phase 2.
 
-## Phase 5 — NGO portal
+## Later product phases
 
-- Implement NGO organization profile and verification-status views; approved NGOs may inspect eligible public listings already delivered in Phase 2.
-- Add NGO-specific discovery improvements only where requirements extend beyond the public discovery experience. Keep public maps optional and subject to the approved location policy; never return exact coordinates/contact/pickup details.
-- Collection history waits until pickups exist in Phase 6.
+Donor publishing, claims, pickups, admin workflows, location-based discovery, realtime notifications and analytics are later work. Their sequencing and requirements must be reconciled with Phase 2 outcomes and owner decisions before implementation; this document does not authorize expanding Phase 2.
 
-## Phase 6 — Claims, pickups, expiry, notifications and exceptions
+## Remaining boundaries and verification
 
-- Implement the one-NGO, all-or-nothing claim model: Pending request reserves the entire donation immediately; donor approves/rejects; idempotent approval-window expiry and release.
-- Add donor claim review here, not in Phase 4. Use Atlas transactions, conditional updates, idempotency and concurrent-request tests.
-- Add pickup slot selection/booking, readiness, rescheduling, collection confirmation, cancellation, missed/disputed exceptions and admin resolution endpoints.
-- Implement persisted in-app notifications, unread count and history as part of the MVP. REST remains authoritative; do not add email/SMS or require Socket.IO.
-- NGO collection history begins only after pickup data exists.
-- Exit: state/permission matrix, over-allocation, reservation release, expiry, no-double-booking and missed-pickup tests pass.
-
-## Phase 7 — Maps and optional realtime delivery
-
-- Add Leaflet map/list discovery only after location privacy and accessible list behavior are verified.
-- Socket.IO is optional follow-up: authenticate handshakes, authorize rooms/events, deliver minimal notices after committed writes, and recover through REST. It is not required for the MVP notification contract.
-
-## Phase 8 — Full administrator portal
-
-- Extend the minimal Phase 3 verification capability with user/listing/claim moderation, exception resolution views, audit history and platform statistics.
-- All privileged operations remain server-authorized and audited.
-
-## Phase 9 — Integration, security and deployment readiness
-
-- End-to-end workflows, threat/security review, dependency/secret review, backups/restore, structured redacted logging, readiness/liveness, graceful shutdown, CI and deployment runbooks.
-- Remove `DEV_USE_PUBLIC_DNS` after system DNS supports Atlas SRV/TXT. Production uses platform-managed DNS.
-- Set approval-window value, pickup slot/timezone policy, food eligibility jurisdiction, evidence review criteria and retention schedules before launch.
-
-## Legacy tracking note
-
-The existing README and Development Log use older phase numbering. They are not edited in this documentation-only task; reconcile them in a later approved documentation pass so they do not imply that product phases are complete.
+- The future Donation status lifecycle remains intentionally undefined beyond Phase 2's Available status.
+- Food-safety/eligibility policy for the launch jurisdiction and food-handling requirements remain pending.
+- Candidate indexes remain unfinalized until query-plan evidence is available.
+- No location discovery is included in Phase 2, so approximate-location precision is not a Phase 2 prerequisite.
+- M0 is complete. M1 implementation is present, but milestone acceptance remains incomplete because existing loopback health tests failed with `EACCES` in the current environment. See [Project status](../../PROJECT_STATUS.md) for verified checks.

@@ -2,69 +2,61 @@
 
 ## Status and principles
 
-This document separates the existing scaffold from the approved MVP target. The target is not implemented. Preserve React/Vite, Express, Mongoose, MongoDB Atlas and Socket.IO. Build incrementally, enforce all business rules on the server, and do not introduce dependencies without a concrete need and approval.
+Phase 1 is implemented; Phase 2 is finalized but planned. Preserve React/Vite, Express, Mongoose and MongoDB. Use the existing layered structure and verify current dependency compatibility before any future tooling changes. Do not treat planned models or workflows as implemented.
 
 ## Existing system
 
 ```mermaid
 flowchart LR
-  Browser[React health page] -->|Axios GET /api/v1/health| Express[Express app]
+  Browser[React public app] -->|Axios GET /api/v1/health| Express[Express app]
   Express --> Health[Health route]
-  Express --> IO[Socket.IO server initialized, no feature events]
+  Express --> IO[Socket.IO initialized; no feature events]
   Express --> Mongoose[Mongoose connection]
-  Mongoose --> Atlas[(MongoDB Atlas)]
+  Mongoose --> DB[(MongoDB)]
 ```
 
-The only API route is `GET /api/v1/health`. The backend validates environment configuration, configures middleware and waits for MongoDB before listening. Socket.IO is created without application event/auth behavior. There are no feature models, auth flows, uploads, notifications or user-facing product workflows.
+The health route is the only current application API route. The existing frontend has the public shell and health-status request. M1 adds the Organization and Donation domain models and exact-quantity utilities; donation APIs remain unimplemented.
 
-## Target request and data flow
+## Phase 2 target request and data flow
 
-1. React Router renders public or role-specific views. Client route guards improve navigation only.
-2. Feature API modules call the existing Axios client; public listing responses contain approximate location only.
-3. Express applies Helmet, explicit CORS, parsing limits, sanitization, route-specific rate limits, authentication, authorization and Zod validation.
-4. Controllers translate HTTP requests; services enforce membership, verification, ownership, eligibility and state transitions.
-5. Mongoose models and MongoDB persist state. Claim reservation/release and associated claim writes use an Atlas transaction with conditional state updates and idempotency.
-6. Persist in-app notifications in MongoDB. REST is authoritative in the MVP. Socket.IO is deferred; later it may deliver minimal notices to authorized recipients after transaction commit.
+1. Responsive React listing and detail pages call the existing Axios client.
+2. Express validates query parameters and identifiers, then routes public requests through controllers and services.
+3. Services query MongoDB for records whose status is Available, `availableUntil` is later than server time, and `availableQuantity` is positive.
+4. Explicit public DTO allowlists return only the approved donation fields and nested Organization `name`. Private fields and internal state are never serialized.
+5. Listing responses apply token-based MongoDB text search, the seven approved categories from `shared/donationCategories.mjs`, bounded pagination and stable sorting.
+6. Dates persist as UTC instants and are serialized consistently as ISO 8601 UTC; the browser formats local time without affecting availability.
 
 ```mermaid
 flowchart LR
-  UI[React views] --> Router[React Router]
-  Router --> APIClient[Axios API modules]
-  APIClient --> API[Express /api/v1]
-  API --> Guard[Auth, RBAC, ownership, validation]
-  Guard --> Controllers[Layered controllers]
-  Controllers --> Services[Domain services]
-  Services --> Models[Mongoose models]
-  Models --> DB[(MongoDB Atlas)]
-  Services --> Cloudinary[Private evidence / listing image adapter]
-  Services --> Notice[Persisted in-app notifications]
-  Notice -. later only .-> Socket[Authorized Socket.IO notice delivery]
-  Socket -.-> UI
+  UI[React listing/detail pages] --> Router[React Router]
+  Router --> Client[Existing Axios client]
+  Client --> API[Express /api/v1/donations]
+  API --> Validate[Query and identifier validation]
+  Validate --> Controller[Controller]
+  Controller --> Service[Donation discovery service]
+  Service --> Models[Donation and Organization models]
+  Models --> DB[(MongoDB)]
+  Service --> DTO[Allowlisted public DTO]
 ```
 
-## Architecture choice: extend the existing layered scaffold
+## Architecture choice
 
-Use the existing top-level backend layers: `config`, `routes`, `controllers`, `services`, `models`, `validators`, `middleware`, `sockets`, `jobs`, and `utils`. Keep files feature-named (for example `donationService.js`, `claim.routes.js`) and group related validators/services by feature within those layers. Do not migrate to a second `modules/<feature>/<layer>` tree. The current `.gitkeep` directories are scaffolding, not implemented features.
+Extend the current backend top-level layers (`routes`, `controllers`, `services`, `models`, `validators`, `middleware`, and `utils`) and frontend `routes`, `pages`, `components`, and `api` directories. Keep query/domain logic out of route handlers and presentation components. Avoid a broad restructure.
 
-Frontend should extend its existing `routes`, `pages`, `components`, `api`, `context`, `hooks` and `utils` directories. Add only the page/layout/component separation needed by the next phase; no broad restructure is required.
+## Phase 2 boundaries
 
-## Approved MVP domain rules
+- Phase 2 includes public read-only discovery and a minimal Organization record for donation association and public display name.
+- Phase 2 excludes authentication, registration, verification, donor publishing, claims, reservations, pickup scheduling, admin dashboards, location discovery, uploads/Cloudinary, Socket.IO notices and real-activity impact analytics.
+- Seed data is development-only, idempotent, production-blocked, never run at server startup, and must not delete unrelated records.
+- Public availability is server-derived; there is no client availability query parameter.
+- No public location precision has been approved. Do not expose location or add location-based discovery.
 
-- A normal user has one primary Donor or NGO role and one organization membership. Admin is separately provisioned. Keep membership as a relationship so multi-organization support can be added later.
-- Both donor and NGO organizations must be approved and active. Donors may publish; verified NGOs may claim.
-- One donation can have one active all-or-nothing claim. Claim request reserves the full donation immediately; donor approval is required. Rejection, eligible cancellation and pending timeout release the reservation atomically and idempotently.
-- Donation states: `available → reserved → claimed → completed`; other terminal states `cancelled`, `expired`. Pending release returns to `available` only if the listing is still eligible/active and before its pickup deadline. No partial claim state.
-- Claim states: `pending → approved | rejected | cancelled | expired`; `approved → completed | cancelled | exceptionReview`; exception review resolves to completed or cancelled. A missed approved pickup never automatically republishes food.
-- Pickup states: `awaitingSlotSelection → scheduled → readyForPickup → completed`; rescheduling is explicit; a missed/disputed slot enters exception review; cancellation does not implicitly release a donation without the eligibility rule.
-- Keep collection/pickup deadline separate from food expiry. Store exact locations privately and return approximate coordinates publicly. Reveal exact pickup details only to the NGO with an `approved` claim and authorized admins.
+## Reliability, privacy and pending decisions
 
-The canonical transitions and field requirements are in [Product requirements](PRODUCT_REQUIREMENTS.md); database/API/test documents must use the same terms.
+The public Donation DTO is exactly `id`, `title`, `description`, `category`, decimal-string `quantity`, decimal-string `availableQuantity`, `quantityUnit`, `availableUntil`, optional `foodExpiryAt`, optional `preparedAt`, optional `packedAt`, and nested Organization `name` only. Exclude Donation status and Organization `_id`, `type`, and timestamps, as well as exact address/coordinates, private contacts, pickup instructions, verification evidence, moderation details and internal claim/state data. Missing, expired or unavailable records return the same generic not-found response.
 
-## Security and reliability boundaries
+Use Decimal128 for exact quantities, validate owner-approved unit precision, accept decimal strings, and serialize quantities as strings. The sole public Organization field is `name`; `type` is an unrestricted string and is not a category enum. The only status defined for Phase 2 discovery is Available; do not define the future lifecycle.
 
-- CORS is not authorization or CSRF defense. Current development-only loopback CORS behavior and production `CLIENT_URL` policy remain as implemented; do not widen production origins.
-- `DEV_USE_PUBLIC_DNS` is a temporary development-only Windows workaround, defaults off, and is rejected in test/production. Do not deploy it enabled; use platform-managed DNS and remove it when fixed.
-- Cloudinary credentials stay server-side. Public donation images and private verification evidence use distinct authorization/access rules.
-- Keep health compatibility with the current frontend; use the standardized envelope for new business routes.
-- Current server has no readiness/liveness split, shutdown handling, retry/backoff, production structured logging or operational deployment configuration. Define those before deployment.
-- Do not make socket delivery the source of truth. Persist notification/state first, then offer a future authorized realtime notice.
+Donation errors use the approved business envelope and initial mapping in [API specification](API_SPECIFICATION.md), with details null. Error formatting must not change the current health response or unrelated unknown-route behavior.
+
+Candidate indexes (`status + availableUntil`, `category + status + availableUntil`, and text on `title + description`) require query-plan validation; no definitions or query plans are finalized. Food-safety/eligibility and handling requirements remain pending. Location discovery is excluded in Phase 2. Preserve the current health response shape.

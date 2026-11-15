@@ -10,10 +10,8 @@ Edible surplus can go unused when donors lack a straightforward way to share ava
 
 ## Intended workflow
 
-1. **Donors** publish surplus food with quantity, preparation, handling, storage and collection details.
-2. **NGOs and community organizations** discover available listings and request suitable donations.
-3. **Donors and NGOs** coordinate an approved claim and a collection.
-4. **Administrators** verify organizations and handle moderation and exceptions.
+1. In the planned Phase 2 public experience, visitors discover demo and future real donation listings.
+2. Later phases may add donor publishing, NGO claims, collection coordination and administration.
 
 This is the planned product workflow. Publishing, discovery, claiming, organization verification and administrator workflows are not live features yet. The current application is a public landing page and API health-status foundation; see [Project status](PROJECT_STATUS.md).
 
@@ -21,9 +19,9 @@ This is the planned product workflow. Publishing, discovery, claiming, organizat
 
 - Phase 0 architecture consolidation: completed.
 - Phase 1 design system and public frontend foundation: completed.
-- Phase 2 — Public Experience & Real Donation Discovery: awaiting explicit approval; not started.
+- Phase 2 — Public Experience & Real Donation Discovery: scope and M0 owner decisions finalized; implementation not started.
 
-The Phase 2 plan calls for real MongoDB-backed listing/detail APIs, with development-only seeded records as sample data. It does not include donor publishing. Location-based discovery depends on an owner decision about public location approximation precision.
+The Phase 2 plan calls for MongoDB-backed donation listing/detail APIs and pages, search, seven approved food categories, pagination, deterministic sorting, privacy-safe public data, a development-only seed and automated tests. M0 decisions are finalized. M1 shared categories, models and quantity utilities are implemented, but M1 acceptance is incomplete because existing loopback health tests failed with `EACCES` in the current environment. Phase 2 excludes authentication, verification, donor publishing, claims, pickup scheduling, admin dashboards, location-based discovery, uploads, Socket.IO notifications and real-activity impact analytics. See [Project status](PROJECT_STATUS.md) and the [roadmap](docs/architecture/DEVELOPMENT_ROADMAP.md).
 
 ## Technology
 
@@ -36,7 +34,7 @@ The Phase 2 plan calls for real MongoDB-backed listing/detail APIs, with develop
 
 ### Installed for planned work
 
-JWT, bcryptjs, Cloudinary, Multer, Leaflet/React Leaflet, Socket.IO Client, MongoDB Memory Server and other packages are present in package manifests. Authentication, uploads, maps, domain models, realtime events and the related product workflows are not implemented. See the [architecture documentation](docs/architecture/).
+JWT, bcryptjs, Cloudinary, Multer, Leaflet/React Leaflet, Socket.IO Client, MongoDB Memory Server and other packages are present in package manifests. Authentication, uploads, maps, donation APIs, realtime events and related product workflows are not implemented. See the [architecture documentation](docs/architecture/).
 
 ## Repository structure
 
