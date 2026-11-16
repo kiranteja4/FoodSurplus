@@ -73,6 +73,10 @@ donationSchema.statics.publicEligibilityFilter = function publicEligibilityFilte
   };
 };
 
+donationSchema.index({ status: 1, availableUntil: 1, createdAt: -1, _id: 1 });
+donationSchema.index({ category: 1, status: 1, availableUntil: 1, createdAt: -1, _id: 1 });
+donationSchema.index({ title: 'text', description: 'text' });
+
 const Donation = mongoose.models.Donation ?? mongoose.model('Donation', donationSchema);
 
 export default Donation;

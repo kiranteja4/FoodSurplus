@@ -26,6 +26,23 @@ M0 owner decisions are finalized and recorded in [Project status](PROJECT_STATUS
 - Vite 5.4.21 production build and a production-bundler check of the shared module passed. No dependencies or package files changed.
 - M1 remains in progress until full-suite verification can pass in an environment that permits the existing health test server to bind loopback.
 
+### M2 — Database Indexes & Development Seed (completed)
+
+- Added compound and text indexes to `Donation.js`:
+  - `{ status: 1, availableUntil: 1, createdAt: -1, _id: 1 }` (feed browse)
+  - `{ category: 1, status: 1, availableUntil: 1, createdAt: -1, _id: 1 }` (category browse)
+  - `{ title: 'text', description: 'text' }` (keyword search)
+- Evaluated compound index sort semantics: confirmed that leading equalities lock the partition and subsequent keys match the approved multi-key sort `{ availableUntil: 1, createdAt: -1, _id: 1 }` without an in-memory `SORT` stage.
+- Implemented development seed engine in `backend/scripts/`:
+  - `seedData.js`: 4 organizations and 18 demo donations with deterministic fixed IDs, valid future dates (2028), covering all 7 approved categories and 6 quantity units.
+  - `seedRunner.js`: Idempotent insert-only upsert engine with normalized payload comparison (Decimal128, ObjectId, Date timestamps, scalar strings), `SeedCollisionError` on mismatch, zero deletions, and `E11000` duplicate-key race recovery.
+  - `seed.js`: Safe CLI entry point with dynamic imports and pre-import synchronous production guard (`NODE_ENV === 'production'`).
+  - Added `"seed": "node scripts/seed.js"` to `backend/package.json`.
+- Added comprehensive automated tests:
+  - `backend/tests/indexes.test.js`: Verified schema index declarations and `explain('executionStats')` query plans against an isolated in-memory MongoDB instance; verified `IXSCAN` usage, exact index names, and absence of in-memory `SORT` stages.
+  - `backend/tests/seed.test.js`: Verified synchronous production guard blocking, manifest integrity, first-run insertions, second-run idempotency (0 inserted, 0 deleted, all skipped), collision detection without overwriting, and preservation of pre-existing unrelated documents.
+- All 13 tests across `indexes.test.js` and `seed.test.js` passed (along with all 44 existing model, quantity, category, CORS, and DNS unit tests). Production guard verified via CLI. Documented schema in `DATABASE_SCHEMA.md`.
+
 ## Later phases — planned
 
 - **Phase 3 and later:** Authentication/registration/verification, donor publishing, claims, pickup scheduling, admin workflows, location discovery, realtime delivery and other product activity remain outside Phase 2. Their requirements and sequencing need owner review before those phases are implemented.
